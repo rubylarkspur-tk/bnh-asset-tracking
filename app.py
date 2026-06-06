@@ -10,19 +10,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ตกแต่งหน้าตาเพิ่มเติมด้วย CSS
+# ตกแต่งหน้าตาเพิ่มเติมด้วย CSS (ปรับให้รองรับทั้ง Light Mode และ Dark Mode อัตโนมัติ)
 st.markdown("""
     <style>
-    .stApp {
-        background-color: #f8f9fa;
-    }
-    h1 {
-        color: #0c2340;
-        font-weight: 700;
-    }
+    /* ขยายขนาดตัวเลข Metric ให้ใหญ่และเด่นชัด */
     div[data-testid="stMetricValue"] {
-        font-size: 28px;
-        font-weight: bold;
+        font-size: 28px !important;
+        font-weight: bold !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -113,7 +107,7 @@ try:
                     hide_index=True
                 )
     
-    # คำสั่งรีเฟรชหน้าจออัตโนมัติ (วิธีที่ถูกต้องสำหรับ Streamlit)
+    # คำสั่งรีเฟรชหน้าจออัตโนมัติอย่างถูกต้องสำหรับระบบ Cloud
     time.sleep(5)
     st.rerun()
     
