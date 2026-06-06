@@ -15,30 +15,33 @@ while True:
     try:
         df = get_data()
         
-        # สร้างคอลัมน์ใหม่สำหรับกราฟโดยเฉพาะ (แปลง 1001 ให้เป็น 1 เพื่อให้จุดกระจายตัว)
+        # แปลงเลขห้องเพื่อการแสดงผลกราฟ
         df['Room_Display'] = df['Room'] % 100
         
         with placeholder.container():
-            # สร้าง Tabs สำหรับแยกชั้น
             tab5, tab6 = st.tabs(["Floor 5", "Floor 6"])
 
             # ---------------- ส่วนของชั้น 5 ----------------
             with tab5:
                 df_5 = df[df['Floor'] == 5]
-                col1, col2 = st.columns([2, 1]) # แบ่งพื้นที่ ซ้าย 2 ส่วน ขวา 1 ส่วน
+                col1, col2 = st.columns([2, 1])
                 
                 with col1:
                     st.subheader("📍 Floor 5 - Asset Location")
-                    # ใช้ Room_Display เพื่อพล็อตจุดให้ดูกว้างขึ้น
                     st.scatter_chart(df_5, x='Zone', y='Room_Display', color='Status (Available / In-use)')
                 
                 with col2:
                     st.subheader("📊 Summary")
-                    # กล่องสรุปจำนวนเครื่องมือในวอร์ด
                     st.metric("Total Assets in Ward 5", len(df_5))
                     
+                    # --- เพิ่มตัวเลขสรุปแยกตาม Status ตรงนี้ ---
+                    s1, s2, s3 = st.columns(3) # แบ่งเป็น 3 ช่องเล็ก
+                    s1.metric("🟢 Available", len(df_5[df_5['Status (Available / In-use)'] == 'Available']))
+                    s2.metric("🔵 In-use", len(df_5[df_5['Status (Available / In-use)'] == 'In-use']))
+                    s3.metric("🔴 Revoked", len(df_5[df_5['Status (Available / In-use)'] == 'Revoked']))
+                    st.write("---") # ขีดเส้นคั่นให้ดูสะอาดตา
+                    
                     st.subheader("📋 Asset Inventory")
-                    # เลือกแสดงเฉพาะคอลัมน์สำคัญเพื่อให้ตารางดูไม่รก
                     st.dataframe(df_5[['Asset_ID', 'Asset_Name', 'Room', 'Zone', 'Status (Available / In-use)']])
 
             # ---------------- ส่วนของชั้น 6 ----------------
@@ -53,6 +56,13 @@ while True:
                 with col2:
                     st.subheader("📊 Summary")
                     st.metric("Total Assets in Ward 6", len(df_6))
+                    
+                    # --- เพิ่มตัวเลขสรุปแยกตาม Status ตรงนี้ ---
+                    s1, s2, s3 = st.columns(3)
+                    s1.metric("🟢 Available", len(df_6[df_6['Status (Available / In-use)'] == 'Available']))
+                    s2.metric("🔵 In-use", len(df_6[df_6['Status (Available / In-use)'] == 'In-use']))
+                    s3.metric("🔴 Revoked", len(df_6[df_6['Status (Available / In-use)'] == 'Revoked']))
+                    st.write("---")
                     
                     st.subheader("📋 Asset Inventory")
                     st.dataframe(df_6[['Asset_ID', 'Asset_Name', 'Room', 'Zone', 'Status (Available / In-use)']])
