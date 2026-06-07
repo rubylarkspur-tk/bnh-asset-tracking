@@ -10,7 +10,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ตกแต่งหน้าตาเพิ่มเติมด้วย CSS (ปรับให้รองรับทั้ง Light Mode และ Dark Mode อัตโนมัติ)
+# ตกแต่งหน้าตาเพิ่มเติมด้วย CSS
 st.markdown("""
     <style>
     /* ขยายขนาดตัวเลข Metric ให้ใหญ่และเด่นชัด */
@@ -40,6 +40,21 @@ try:
     # ---------------- ส่วนของชั้น 5 ----------------
     with tab5:
         df_5 = df[df['Floor'] == 5]
+        
+        # 🚨 [เพิ่มใหม่] เช็กสถานะ Revoked สำหรับ Alarm ชั้น 5
+        revoked_assets_5 = df_5[df_5['Status (Available / In-use)'] == 'Revoked']
+        if not revoked_assets_5.empty:
+            # ยิง Notification เป็นแถบสีแดงเด่นๆ บนหน้าจอ
+            st.error(f"🚨 **ALARM:** พบเครื่องมือแพทย์ถูกสั่ง **Revoked** จำนวน {len(revoked_assets_5)} รายการในชั้น 5! กรุณาตรวจสอบด่วน")
+            
+            # โชว์ตารางด่วนเพื่อให้พยาบาลไปตามเก็บเครื่องได้ถูกห้อง
+            with st.expander("🔍 คลิกเพื่อดูรายชื่อเครื่องที่ต้องเรียกคืนด่วน (Floor 5)", expanded=True):
+                st.dataframe(
+                    revoked_assets_5[['Asset_ID', 'Asset_Name', 'Room', 'Zone']], 
+                    use_container_width=True, 
+                    hide_index=True
+                )
+        
         col1, col2 = st.columns([1.8, 1.2]) 
         
         with col1:
@@ -75,6 +90,19 @@ try:
     # ---------------- ส่วนของชั้น 6 ----------------
     with tab6:
         df_6 = df[df['Floor'] == 6]
+        
+        # 🚨 [เพิ่มใหม่] เช็กสถานะ Revoked สำหรับ Alarm ชั้น 6
+        revoked_assets_6 = df_6[df_6['Status (Available / In-use)'] == 'Revoked']
+        if not revoked_assets_6.empty:
+            st.error(f"🚨 **ALARM:** พบเครื่องมือแพทย์ถูกสั่ง **Revoked** จำนวน {len(revoked_assets_6)} รายการในชั้น 6! กรุณาตรวจสอบด่วน")
+            
+            with st.expander("🔍 คลิกเพื่อดูรายชื่อเครื่องที่ต้องเรียกคืนด่วน (Floor 6)", expanded=True):
+                st.dataframe(
+                    revoked_assets_6[['Asset_ID', 'Asset_Name', 'Room', 'Zone']], 
+                    use_container_width=True, 
+                    hide_index=True
+                )
+                
         col1, col2 = st.columns([1.8, 1.2])
         
         with col1:
