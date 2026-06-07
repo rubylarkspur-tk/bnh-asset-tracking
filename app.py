@@ -92,7 +92,7 @@ try:
         df_6 = df[df['Floor'] == 6]
         
         # 🚨 [เพิ่มใหม่] เช็กสถานะ Revoked สำหรับ Alarm ชั้น 6
-        revoked_assets_6 = df_6[df_6['Status'] == 'Revoked']
+        revoked_assets_6 = df_6[df_6['Status (Available / In-use)'] == 'Revoked']
         if not revoked_assets_6.empty:
             st.error(f"🚨 **ALARM:** พบเครื่องมือแพทย์ถูกสั่ง **Revoked** จำนวน {len(revoked_assets_6)} รายการในชั้น 6! กรุณาตรวจสอบด่วน")
             
