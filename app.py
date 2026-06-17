@@ -164,10 +164,10 @@ try:
                 st.subheader(f"📊 Ward {floor_num} Analytics")
                 st.metric("Active Assets in Ward", f"{len(df_floor)} Units")
                 s1, s2, s3, s4 = st.columns(4)
-                s1.metric("🟢 Avail", len(df_floor[df_floor[STATUS_COL] == 'Available']))
-                s2.metric("🔵 Use", len(df_floor[df_floor[STATUS_COL] == 'In-use']))
+                s1.metric("🟢 Available", len(df_floor[df_floor[STATUS_COL] == 'Available']))
+                s2.metric("🔵 In-Use", len(df_floor[df_floor[STATUS_COL] == 'In-use']))
                 s3.metric("🟡 Dirty", len(df_floor[df_floor[STATUS_COL] == 'Dirty']))
-                s4.metric("🔴 Revoke", len(df_floor[df_floor[STATUS_COL] == 'Revoked']))
+                s4.metric("🔴 Revoked", len(df_floor[df_floor[STATUS_COL] == 'Revoked']))
             
             with st.container(border=True):
                 st.subheader("📋 Live Inventory")
