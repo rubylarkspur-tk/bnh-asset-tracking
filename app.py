@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import time
 from datetime import datetime
-import plotly.express as px  # นำเข้าเครื่องมือทำ Pie Chart
+import plotly.express as px  # ใช้สำหรับทำกราฟแท่ง
 
 st.set_page_config(
     page_title="BNH Asset Tracking",
@@ -14,18 +14,23 @@ st.set_page_config(
 st.markdown("""
     <style>
     div[data-testid="stMetricValue"] {
-        font-size: 24px !important;
+        font-size: 26px !important;
         font-weight: bold !important;
     }
     .time-badge {
         color: #888;
         font-size: 12px;
     }
+    /* ปรับให้ Expander ดูเนียนตาขึ้น */
+    .streamlit-expanderHeader {
+        font-size: 14px;
+        color: #ddd;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🏥 BNH Asset Tracking Dashboard")
-st.markdown("ระบบติดตามตำแหน่งและสถานะเครื่องมือแพทย์ส่วนหน้า (Single Sheet & Analytics)")
+st.markdown("ระบบติดตามตำแหน่งและสถานะเครื่องมือแพทย์ส่วนหน้า (Single Sheet & Inventory Analytics)")
 
 def get_data():
     url = "https://docs.google.com/spreadsheets/d/1_WNF8BnR-CnirM85zypDxPXUe1IvHK9LfYhW4ehtWco/export?format=csv"
@@ -43,14 +48,11 @@ try:
     df = get_data()
     STATUS_COL = 'Status (Available / In-use / Revoked / Dirty)'
     
-    # เช็กคอลัมน์สำคัญ ป้องกัน Error หากยังไม่ได้พิมพ์ใน Sheets
-    if 'Is_In_Pool' not in df.columns:
-        df['Is_In_Pool'] = False
-    else:
-        df['Is_In_Pool'] = df['Is_In_Pool'].astype(str).str.upper().str.strip() == 'TRUE'
+    # เช็กและสร้างคอลัมน์ใหม่ถ้ายังไม่มี
+    if 'Is_In_Pool' not in df.columns: df['Is_In_Pool'] = False
+    else: df['Is_In_Pool'] = df['Is_In_Pool'].astype(str).str.upper().str.strip() == 'TRUE'
         
-    if 'Last_Action' not in df.columns:
-        df['Last_Action'] = "No Record"
+    if 'Last_Action' not in df.columns: df['Last_Action'] = ""
 
     df['Room_Display'] = df['Room'] % 100
     df['Last_Moved'] = pd.to_datetime(df['Last_Moved'], errors='coerce')
@@ -60,18 +62,14 @@ try:
 
     # ---------------- ฟังก์ชัน: ระบบค้นหา Proximity ----------------
     st.sidebar.header("🔍 Smart Proximity Finder")
-    st.sidebar.markdown("ระบบค้นหาเครื่องมือว่างที่ใกล้ที่สุดในวอร์ด")
+    st.sidebar.markdown("ค้นหาเครื่องมือว่างที่ใกล้ที่สุดในวอร์ด")
     
     avail_in_ward = df[(df[STATUS_COL] == 'Available') & (df['Is_In_Pool'] == False)]
     
-    if 'Type' in df.columns:
-        asset_types = df['Type'].dropna().unique()
-        req_type = st.sidebar.selectbox("ต้องการหาเครื่องมืออะไร?", asset_types)
-        avail = avail_in_ward[avail_in_ward['Type'] == req_type].copy()
-    else:
-        asset_types = df['Asset_Name'].dropna().unique()
-        req_type = st.sidebar.selectbox("ต้องการหาเครื่องมืออะไร?", asset_types)
-        avail = avail_in_ward[avail_in_ward['Asset_Name'] == req_type].copy()
+    count_col = 'Type' if 'Type' in df.columns else 'Asset_Name'
+    asset_types = df[count_col].dropna().unique()
+    req_type = st.sidebar.selectbox("ต้องการหาเครื่องมืออะไร?", asset_types)
+    avail = avail_in_ward[avail_in_ward[count_col] == req_type].copy()
 
     req_floor = st.sidebar.radio("ค้นหาในชั้นไหน?", [5, 6])
     req_room = st.sidebar.number_input("คุณอยู่ห้องเลขที่เท่าไหร่?", min_value=1000, max_value=9999, value=1501)
@@ -93,40 +91,39 @@ try:
     with top_col1:
         st.subheader("🚨 Critical Alert Center")
         
-        # 1. Revoked (มี Expander)
+        # 1. Revoked
         revoked = df[df[STATUS_COL] == 'Revoked']
         if not revoked.empty:
-            st.error(f"🔴 **ALARM (REVOKED):** พบเครื่องมือถูกระงับการใช้งาน {len(revoked)} รายการ!")
-            with st.expander("🔍 ดูรายชื่อเครื่องที่ถูก Revoked"):
-                st.dataframe(revoked[['Asset_ID', 'Asset_Name', 'Room', 'Last_Moved']], hide_index=True)
+            st.error(f"🔴 **ALARM (REVOKED):** ระงับการใช้งาน {len(revoked)} รายการ!")
+            with st.expander("🔍 ดูรายชื่อเครื่องที่ถูก Revoked", expanded=False):
+                st.dataframe(revoked[['Asset_ID', 'Asset_Name', 'Floor', 'Room']], hide_index=True)
 
-        # 2. Dirty (มี Expander แล้ว)
+        # 2. Dirty
         dirty = df[df[STATUS_COL] == 'Dirty']
         if not dirty.empty:
-            st.warning(f"🟡 **CLEANSING REQUIRED:** มีเครื่องมือรอทำความสะอาด {len(dirty)} รายการ")
-            with st.expander("🔍 ดูรายชื่อเครื่องที่รอทำความสะอาด"):
-                st.dataframe(dirty[['Asset_ID', 'Asset_Name', 'Room', 'Last_Moved']], hide_index=True)
+            st.warning(f"🟡 **CLEANSING REQUIRED:** รอทำความสะอาด {len(dirty)} รายการ")
+            with st.expander("🔍 ดูรายชื่อเครื่องที่รอทำความสะอาด", expanded=False):
+                st.dataframe(dirty[['Asset_ID', 'Asset_Name', 'Floor', 'Room']], hide_index=True)
 
-        # 3. PM Due Soon (มี Expander แล้ว)
+        # 3. PM Due Soon
         df['Days_to_PM'] = (df['Next_PM_Date'] - SIMULATION_TIME).dt.days
         pm_due = df[df['Days_to_PM'] <= 30]
         if not pm_due.empty:
-            st.info(f"🔧 **PM DUE SOON:** เครื่องใกล้กำหนดซ่อมบำรุงใน 30 วัน จำนวน {len(pm_due)} รายการ")
-            with st.expander("🔍 ดูรายชื่อเครื่องที่ใกล้หมดอายุ PM"):
-                st.dataframe(pm_due[['Asset_ID', 'Asset_Name', 'Room', 'Next_PM_Date', 'Days_to_PM']], hide_index=True)
+            st.info(f"🔧 **PM DUE SOON:** ใกล้หมดอายุซ่อมบำรุงใน 30 วัน จำนวน {len(pm_due)} รายการ")
+            with st.expander("🔍 ดูรายชื่อเครื่องที่ใกล้หมดอายุ PM", expanded=False):
+                st.dataframe(pm_due[['Asset_ID', 'Asset_Name', 'Room', 'Days_to_PM']], hide_index=True)
 
-        # 4. Hoarding (มี Expander แล้ว)
+        # 4. Hoarding
         df['Hours_Idle'] = (SIMULATION_TIME - df['Last_Moved']).dt.total_seconds() / 3600
         hoarded = df[(df[STATUS_COL] == 'Available') & (df['Hours_Idle'] > 168) & (df['Is_In_Pool'] == False)]
         if not hoarded.empty:
-            st.warning(f"⚠️ **HOARDING ALERT:** พบเครื่องมือว่างถูกจอดแช่ในวอร์ดเกิน 7 วัน จำนวน {len(hoarded)} รายการ")
-            with st.expander("🔍 ดูรายชื่อเครื่องที่อาจถูกกักตุน"):
+            st.warning(f"⚠️ **HOARDING ALERT:** จอดแช่ว่างๆ เกิน 7 วัน จำนวน {len(hoarded)} รายการ")
+            with st.expander("🔍 ดูรายชื่อเครื่องที่อาจถูกกักตุน", expanded=False):
                 st.dataframe(hoarded[['Asset_ID', 'Asset_Name', 'Floor', 'Room', 'Hours_Idle']], hide_index=True)
                 
     with top_col2:
         st.subheader("📡 Live Activity Feed")
         with st.container(border=True, height=290):
-            # ดึงข้อมูลจากชีตหลัก เรียงตามเวลาล่าสุด
             recent_df = df.sort_values(by='Last_Moved', ascending=False).head(5)
             for index, row in recent_df.iterrows():
                 time_diff = SIMULATION_TIME - row['Last_Moved']
@@ -138,8 +135,7 @@ try:
                 elif row[STATUS_COL] == 'Revoked': icon = "🔴"
                 else: icon = "⚪"
                 
-                # แสดงแอคชั่นจากคอลัมน์ Last_Action
-                action_text = row['Last_Action'] if pd.notnull(row['Last_Action']) else "Updated Status"
+                action_text = row['Last_Action'] if pd.notnull(row['Last_Action']) and row['Last_Action'] != "" else "Updated Status"
                 
                 st.markdown(f"""
                     <div style='margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #333;'>
@@ -183,10 +179,15 @@ try:
     with tab6:
         render_floor_tab(6)
 
-    # ---------------- แท็บที่ 3: ระบบห้องคลังกลาง + Pie Chart ยืมคืน ----------------
+    # ---------------- แท็บที่ 3: ระบบห้องคลังกลาง (นับรวมยอดแบบ Bar Chart) ----------------
     with tab_pool:
+        # 1. สินค้าที่เหลืออยู่ในคลัง (Is_In_Pool = True)
         df_pool = df[df['Is_In_Pool'] == True]
-        col_p1, col_p2 = st.columns([1.2, 1.8]) # ปรับขนาดให้ฝั่งกราฟกว้างขึ้น
+        
+        # 2. สินค้าที่ถูกยืมไป (เช็กจากคำว่า ยืม, Borrow, หรือ out ในคอลัมน์ Last_Action)
+        df_borrowed = df[(df['Is_In_Pool'] == False) & (df['Last_Action'].str.contains('Borrow|ยืม|out', case=False, na=False))]
+        
+        col_p1, col_p2 = st.columns([1.2, 1.8]) 
         
         with col_p1:
             with st.container(border=True):
@@ -203,37 +204,47 @@ try:
                 else:
                     st.success(f"✅ สต็อก Infusion Pump ปกติ (พร้อมใช้ {available_pumps} เครื่อง)")
                     
-                st.write("รายการเครื่องมือในคลังกลางปัจจุบัน")
+                st.write("📋 รายชื่อเครื่องมือที่อยู่ในคลังกลางปัจจุบัน")
                 st.dataframe(df_pool[['Asset_ID', 'Asset_Name', STATUS_COL]], use_container_width=True, hide_index=True)
 
         with col_p2:
             with st.container(border=True):
-                st.subheader("📊 Borrow & Return Distribution")
-                st.markdown("สัดส่วนพฤติกรรมการยืม-คืนเครื่องมือแพทย์ล่าสุด")
+                st.subheader("📊 Pool Inventory Summary")
+                st.markdown("สรุปสถานะการยืม-คืน เครื่องมือของคลังกลาง")
                 
-                # นำคอลัมน์ Last_Action มานับจำนวนเพื่อสร้าง Pie Chart
-                # กรองเอาพวกที่เป็นค่าว่าง (No Record) ออก เพื่อความสวยงาม
-                df_action = df[df['Last_Action'] != 'No Record']
+                # โชว์ตัวเลข Total ชัดๆ
+                m1, m2 = st.columns(2)
+                m1.metric("📥 จำนวนเหลืออยู่ในคลัง", f"{len(df_pool)} เครื่อง")
+                m2.metric("📤 ยอดถูกยืมใช้งานปัจจุบัน", f"{len(df_borrowed)} เครื่อง")
                 
-                if not df_action.empty:
-                    action_counts = df_action['Last_Action'].value_counts().reset_index()
-                    action_counts.columns = ['Action', 'Count']
+                st.write("---")
+                st.markdown("**กราฟจำนวนเครื่องคงเหลือในคลัง (แยกตามประเภท)**")
+                
+                if not df_pool.empty:
+                    pool_counts = df_pool[count_col].value_counts().reset_index()
+                    pool_counts.columns = ['Asset', 'Count']
                     
-                    # สร้าง Pie Chart แบบโดนัท
-                    fig = px.pie(
-                        action_counts, 
-                        values='Count', 
-                        names='Action', 
-                        hole=0.4, # เจาะรูตรงกลางให้เป็นโดนัท
+                    # สร้าง Bar Chart แบบแนวนอนให้อ่านง่าย
+                    fig = px.bar(
+                        pool_counts, 
+                        x='Count', 
+                        y='Asset',
+                        orientation='h',
+                        text='Count',
+                        color='Asset',
                         color_discrete_sequence=px.colors.qualitative.Pastel
                     )
-                    fig.update_traces(textposition='inside', textinfo='percent+label', textfont_size=16)
-                    fig.update_layout(margin=dict(t=20, b=20, l=20, r=20), showlegend=False)
-                    
-                    # แสดงกราฟ
+                    fig.update_traces(textposition='inside', textfont_size=16)
+                    fig.update_layout(
+                        showlegend=False, 
+                        xaxis_title="จำนวนเครื่องที่เหลือ (Units)", 
+                        yaxis_title="",
+                        margin=dict(t=10, b=10, l=10, r=10),
+                        height=250
+                    )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.info("กรุณาเพิ่มข้อมูลในคอลัมน์ 'Last_Action' ใน Google Sheets เพื่อแสดงกราฟ")
+                    st.info("คลังกลางว่างเปล่า ไม่มีเครื่องมือเหลืออยู่")
 
     time.sleep(5)
     st.rerun()
