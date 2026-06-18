@@ -58,7 +58,7 @@ try:
     df['Last_Moved'] = pd.to_datetime(df['Last_Moved'], errors='coerce')
     df['Next_PM_Date'] = pd.to_datetime(df['Next_PM_Date'], errors='coerce')
     
-    SIMULATION_TIME = pd.to_datetime('2026-06-17 20:45:00') 
+    SIMULATION_TIME = pd.Timestamp.now(tz='Asia/Bangkok').tz_localize(None) 
 
     # ---------------- ฟังก์ชัน: ระบบค้นหา Proximity ----------------
     st.sidebar.header("🔍 Smart Proximity Finder")
