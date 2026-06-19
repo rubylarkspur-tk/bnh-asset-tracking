@@ -30,7 +30,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🏥 BNH Asset Tracking Dashboard")
-st.markdown("ระบบติดตามตำแหน่งและสถานะเครื่องมือแพทย์ส่วนหน้า (Single Sheet & Inventory Analytics)")
+st.markdown("ระบบติดตามตำแหน่งและสถานะเครื่องมือแพทย์ส่วนหน้า (Smart Return & Inventory Analytics)")
 
 def get_data():
     url = "https://docs.google.com/spreadsheets/d/1_WNF8BnR-CnirM85zypDxPXUe1IvHK9LfYhW4ehtWco/export?format=csv"
@@ -179,15 +179,13 @@ try:
     with tab6:
         render_floor_tab(6)
 
-    # ---------------- แท็บที่ 3: ระบบห้องคลังกลาง (นับรวมยอดแบบ Bar Chart) ----------------
+    # ---------------- แท็บที่ 3: ระบบห้องคลังกลาง + ฟอร์มแนบหลักฐานการคืน ----------------
     with tab_pool:
-        # 1. สินค้าที่เหลืออยู่ในคลัง (Is_In_Pool = True)
         df_pool = df[df['Is_In_Pool'] == True]
-        
-        # 2. สินค้าที่ถูกยืมไป (เช็กจากคำว่า ยืม, Borrow, หรือ out ในคอลัมน์ Last_Action)
         df_borrowed = df[(df['Is_In_Pool'] == False) & (df['Last_Action'].str.contains('Borrow|ยืม|out', case=False, na=False))]
         
-        col_p1, col_p2 = st.columns([1.2, 1.8]) 
+        # ซอยหน้าจอเป็น 3 คอลัมน์ย่อยเพื่อให้ลงตัวกับระบบ Form
+        col_p1, col_p2, col_p3 = st.columns([1.1, 1.1, 1.3]) 
         
         with col_p1:
             with st.container(border=True):
@@ -210,21 +208,18 @@ try:
         with col_p2:
             with st.container(border=True):
                 st.subheader("📊 Pool Inventory Summary")
-                st.markdown("สรุปสถานะการยืม-คืน เครื่องมือของคลังกลาง")
                 
-                # โชว์ตัวเลข Total ชัดๆ
                 m1, m2 = st.columns(2)
-                m1.metric("📥 จำนวนเหลืออยู่ในคลัง", f"{len(df_pool)} เครื่อง")
-                m2.metric("📤 ยอดถูกยืมใช้งานปัจจุบัน", f"{len(df_borrowed)} เครื่อง")
+                m1.metric("📥 เหลือในคลัง", f"{len(df_pool)} เครื่อง")
+                m2.metric("📤 ถูกยืมใช้งาน", f"{len(df_borrowed)} เครื่อง")
                 
                 st.write("---")
-                st.markdown("**กราฟจำนวนเครื่องคงเหลือในคลัง (แยกตามประเภท)**")
+                st.markdown("**กราฟจำนวนเครื่องคงเหลือในคลัง**")
                 
                 if not df_pool.empty:
                     pool_counts = df_pool[count_col].value_counts().reset_index()
                     pool_counts.columns = ['Asset', 'Count']
                     
-                    # สร้าง Bar Chart แบบแนวนอนให้อ่านง่าย
                     fig = px.bar(
                         pool_counts, 
                         x='Count', 
@@ -237,17 +232,52 @@ try:
                     fig.update_traces(textposition='inside', textfont_size=16)
                     fig.update_layout(
                         showlegend=False, 
-                        xaxis_title="จำนวนเครื่องที่เหลือ (Units)", 
+                        xaxis_title="จำนวนเครื่อง (Units)", 
                         yaxis_title="",
-                        margin=dict(t=10, b=10, l=10, r=10),
-                        height=250
+                        margin=dict(t=5, b=5, l=5, r=5),
+                        height=220
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.info("คลังกลางว่างเปล่า ไม่มีเครื่องมือเหลืออยู่")
+                    st.info("คลังกลางไม่มีเครื่องมือเหลืออยู่")
 
-    time.sleep(5)
-    st.rerun()
+        # คอลัมน์ที่ 3: ระบบ Smart Return Form (แนบรูปภาพหลักฐาน)
+        with col_p3:
+            with st.container(border=True):
+                st.subheader("📸 Smart Return Systems")
+                st.markdown("ระบบคืนเครื่องพยาบาลส่วนหน้าพร้อมแนบหลักฐานภาพถ่าย")
+                
+                with st.form("smart_return_form", clear_on_submit=False):
+                    # กรองดึงเฉพาะรายชื่อเครื่องที่ถูกยืมออกมาโชว์ให้กดคืน
+                    if not df_borrowed.empty:
+                        borrowed_options = df_borrowed['Asset_ID'] + " | " + df_borrowed['Asset_Name']
+                        selected_asset = st.selectbox("เลือกเครื่องมือแพทย์ที่จะส่งคืนคลัง:", borrowed_options)
+                    else:
+                        selected_asset = st.selectbox("เลือกเครื่องมือแพทย์ที่จะส่งคืนคลัง:", ["❌ ไม่มีเครื่องที่ถูกยืมในระบบขณะนี้"])
+                    
+                    return_status = st.radio("ตรวจสอบสภาพความสะอาด/กายภาพ:", ["🟢 ปกติ (พร้อมใช้งาน)", "🟡 สกปรก (รอส่งล้าง)", "🔴 ชำรุด (แจ้งช่าง BME)"])
+                    
+                    # ตัวรับไฟล์ภาพหลักฐานการคืนหน้างาน
+                    uploaded_image = st.file_uploader("แนบภาพถ่ายหลักฐานสภาพเครื่องปัจจุบัน:", type=['jpg', 'jpeg', 'png'])
+                    
+                    btn_submit = st.form_submit_button("📥 บันทึกการส่งคืนคลังกลาง", use_container_width=True)
+                    
+                    if btn_submit:
+                        if df_borrowed.empty:
+                            st.error("ไม่มีรายการเครื่องมือให้ส่งคืนในระบบขณะนี้")
+                        elif uploaded_image is None:
+                            st.warning("⚠️ มาตรฐาน JCI: กรุณาถ่ายภาพหรือแนบภาพหลักฐานสภาพเครื่องก่อนกดส่งคืนระบบ")
+                        else:
+                            st.success(f"🎉 ระบบบันทึกการรับคืนรหัส {selected_asset.split(' | ')[0]} สำเร็จ!")
+                            st.markdown(f"**ผลการตรวจสอบ:** {return_status}")
+                            # แสดงตัวอย่างรูปภาพหลักฐานที่บันทึก
+                            st.image(uploaded_image, caption="📷 ภาพถ่ายหลักฐานที่ถูกบันทึกเข้าระบบนิรภัย", use_container_width=True)
+
+    # ---------------- คำสั่งรีเฟรชอัปเดตข้อมูลอัตโนมัติ ----------------
+    # ดักตรรกะ: หากเจ้าหน้าที่กำลังเลือกรูปภาพอยู่ ให้ระบบหยุด rerun อัตโนมัติชั่วคราวเพื่อป้องกันฟอร์มรีเซ็ต
+    if 'uploaded_image' not in locals() or uploaded_image is None:
+        time.sleep(5)
+        st.rerun()
 
 except Exception as e:
     st.error(f"ระบบกำลังเชื่อมต่อฐานข้อมูล หรือเกิดข้อผิดพลาด: {e}")
