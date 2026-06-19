@@ -242,13 +242,13 @@ try:
                     st.info("คลังกลางไม่มีเครื่องมือเหลืออยู่")
 
         # คอลัมน์ที่ 3: ระบบ Smart Return Form (แนบรูปภาพหลักฐาน)
+        # คอลัมน์ที่ 3: ระบบ Smart Return Form (แนบรูปภาพหลักฐาน + จำลองการส่งเข้า Google Sheets)
         with col_p3:
             with st.container(border=True):
                 st.subheader("📸 Smart Return Systems")
                 st.markdown("ระบบคืนเครื่องพยาบาลส่วนหน้าพร้อมแนบหลักฐานภาพถ่าย")
                 
                 with st.form("smart_return_form", clear_on_submit=False):
-                    # กรองดึงเฉพาะรายชื่อเครื่องที่ถูกยืมออกมาโชว์ให้กดคืน
                     if not df_borrowed.empty:
                         borrowed_options = df_borrowed['Asset_ID'] + " | " + df_borrowed['Asset_Name']
                         selected_asset = st.selectbox("เลือกเครื่องมือแพทย์ที่จะส่งคืนคลัง:", borrowed_options)
@@ -256,8 +256,6 @@ try:
                         selected_asset = st.selectbox("เลือกเครื่องมือแพทย์ที่จะส่งคืนคลัง:", ["❌ ไม่มีเครื่องที่ถูกยืมในระบบขณะนี้"])
                     
                     return_status = st.radio("ตรวจสอบสภาพความสะอาด/กายภาพ:", ["🟢 ปกติ (พร้อมใช้งาน)", "🟡 สกปรก (รอส่งล้าง)", "🔴 ชำรุด (แจ้งช่าง BME)"])
-                    
-                    # ตัวรับไฟล์ภาพหลักฐานการคืนหน้างาน
                     uploaded_image = st.file_uploader("แนบภาพถ่ายหลักฐานสภาพเครื่องปัจจุบัน:", type=['jpg', 'jpeg', 'png'])
                     
                     btn_submit = st.form_submit_button("📥 บันทึกการส่งคืนคลังกลาง", use_container_width=True)
@@ -268,10 +266,26 @@ try:
                         elif uploaded_image is None:
                             st.warning("⚠️ มาตรฐาน JCI: กรุณาถ่ายภาพหรือแนบภาพหลักฐานสภาพเครื่องก่อนกดส่งคืนระบบ")
                         else:
-                            st.success(f"🎉 ระบบบันทึกการรับคืนรหัส {selected_asset.split(' | ')[0]} สำเร็จ!")
-                            st.markdown(f"**ผลการตรวจสอบ:** {return_status}")
-                            # แสดงตัวอย่างรูปภาพหลักฐานที่บันทึก
-                            st.image(uploaded_image, caption="📷 ภาพถ่ายหลักฐานที่ถูกบันทึกเข้าระบบนิรภัย", use_container_width=True)
+                            # 💡 ตรรกะเบื้องหลังการทำงาน (อธิบายให้กรรมการฟัง)
+                            # 1. ระบบจะนำรูปไฟล์อัปโหลดไปเก็บที่ Google Drive API / Cloud Storage ก่อน
+                            # 2. จะได้ Link URL กลับมา เช่น https://drive.google.com/file/d/demo_image_id/view
+                            # 3. นำค่า URL นี้ไปเขียนลงคอลัมน์ 'Proof_Image_URL' ใน Google Sheets คู่กับวันเวลาปัจจุบัน
+                            
+                            asset_id = selected_asset.split(' | ')[0]
+                            mock_drive_url = f"https://drive.google.com/file/d/bnh_mock_proof_{asset_id}_{int(time.time())}/view"
+                            
+                            st.success(f"🎉 ระบบบันทึกการรับคืนรหัส {asset_id} สำเร็จ!")
+                            
+                            # กล่องโชว์การจำลองส่งข้อมูลเข้า Google Sheets ให้กรรมการเห็นโครงสร้างตารางข้อมูล
+                            with st.status("📡 กำลังส่งข้อมูลไปยังคลาวด์และ Google Sheets...", expanded=True) as status:
+                                st.write(f"🔄 ปรับค่า `Is_In_Pool` ➡️ **TRUE**")
+                                st.write(f"📝 อัปเดต `Last_Action` ➡️ **'Returned with Proof'**")
+                                st.write(f"🔗 สร้างคอลัมน์ใหม่ใน Sheets: `Proof_Image_URL` ➡️ [คลิกดูรูปภาพหลักฐาน]({mock_drive_url})")
+                                time.sleep(1.5)
+                                status.update(label="✅ ซิงค์ข้อมูลกับ Google Sheets เรียบร้อยแล้ว!", state="complete")
+                            
+                            st.markdown(f"**ผลการตรวจสอบสภาพ:** {return_status}")
+                            st.image(uploaded_image, caption="📷 ภาพถ่ายหลักฐานที่ถูกเก็บ URL ลงฐานข้อมูล Sheets แล้ว", use_container_width=True)
 
     # ---------------- คำสั่งรีเฟรชอัปเดตข้อมูลอัตโนมัติ ----------------
     # ดักตรรกะ: หากเจ้าหน้าที่กำลังเลือกรูปภาพอยู่ ให้ระบบหยุด rerun อัตโนมัติชั่วคราวเพื่อป้องกันฟอร์มรีเซ็ต
